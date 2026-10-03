@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.efficient-quick-toggle"
+          path="/org/gnome/shell/extensions/efficient-quick-toggle/">
+
+    <!-- Button positions: number of native round buttons (Screenshot,
+         Settings, Lock, Power) placed before the button. 0 = first, 4 = last. -->
+    <key name="dark-style-slot" type="u">
+      <range min="0" max="4"/>
+      <default>0</default>
+      <summary>Dark Style button position</summary>
+      <description>Number of native round buttons placed before the Dark Style button. 0 puts it first, 4 puts it last.</description>
+    </key>
+    <key name="dnd-slot" type="u">
+      <range min="0" max="4"/>
+      <default>0</default>
+      <summary>Do Not Disturb button position</summary>
+      <description>Number of native round buttons placed before the Do Not Disturb button. 0 puts it first, 4 puts it last.</description>
+    </key>
+    <key name="night-light-slot" type="u">
+      <range min="0" max="4"/>
+      <default>0</default>
+      <summary>Night Light button position</summary>
+      <description>Number of native round buttons placed before the Night Light button. 0 puts it first, 4 puts it last.</description>
+    </key>
+    <key name="button-order" type="u">
+      <range min="0" max="5"/>
+      <default>0</default>
+      <summary>Order of buttons sharing a position</summary>
+      <description>Index into the list of button orderings used when several of this extension's buttons share the same position.</description>
+    </key>
+
+    <!-- Slider thickness -->
+    <key name="slider-thickness-enabled" type="b">
+      <default>false</default>
+      <summary>Customize slider thickness</summary>
+      <description>When off, the volume and brightness sliders use the theme's default thickness.</description>
+    </key>
+    <key name="volume-slider-thickness" type="u">
+      <range min="2" max="16"/>
+      <default>6</default>
+      <summary>Volume slider thickness</summary>
+      <description>Thickness of the volume sliders (output and input) in pixels.</description>
+    </key>
+    <key name="brightness-slider-thickness" type="u">
+      <range min="2" max="16"/>
+      <default>6</default>
+      <summary>Brightness slider thickness</summary>
+      <description>Thickness of the brightness slider in pixels.</description>
+    </key>
+  </schema>
+</schemalist>
