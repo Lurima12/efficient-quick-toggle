@@ -4,8 +4,9 @@ GNOME Shell extension that moves **Dark Style**, **Do Not Disturb** and
 **Night Light** out of the quick settings grid and into the top row, as round
 icon-only buttons next to the screenshot, settings, lock and power buttons.
 The original toggles are hidden while the extension is enabled and restored
-when it is disabled. It can also change the thickness of the volume and
-brightness sliders.
+when it is disabled. You can reorder and show or hide every item of the top
+row (including the battery, screenshot, settings, lock and power buttons), and
+change the thickness of the volume and brightness sliders.
 
 ## Structure
 
@@ -17,9 +18,11 @@ efficient-quick-toggle@lurim412/
 ├── stylesheet.css         # "on" state colour only
 ├── schemas/               # GSettings schema (+ compiled copy)
 └── lib/
-    ├── constants.js           # button ids, orderings, slider limits
+    ├── constants.js           # button ids, layout helpers, slider limits
     ├── roundToggleButton.js   # round icon-only St.Button
-    ├── toggleHider.js         # hides/restores the native toggles
+    ├── actorHider.js          # keeps actors hidden, restores their real visibility
+    ├── toggleHider.js         # hides/restores the native grid toggles
+    ├── topRowLayout.js        # reorders/hides top row items (battery, lock, ...)
     └── sliderStyler.js        # volume/brightness slider thickness
 ```
 
@@ -30,13 +33,41 @@ Extensions app. Changes apply immediately, no restart needed.
 
 **Buttons page**
 
-- **Dark Style / Do Not Disturb / Night Light button**: each can go first,
-  after Screenshot, after Settings, after Lock, or last (after Power).
-- **Button order**: decides the order of buttons that share a position.
+- A list shows the whole top row from left to right (top of the list = left
+  side): your three buttons, the built-in Battery, Screenshot, Settings, Lock
+  and Power items, and a **Flexible space**.
+- **Drag** the handle of any row up or down to move that item. Dragging down
+  drops it after the row you release on, dragging up drops it before.
+- Changes are staged: dragging and the switches only change the list. Press
+  **Apply** to save them and update the top row (the button is enabled while
+  there are unsaved changes). **Reset** restores the default order, shows every
+  item and applies immediately.
+- Each row has a **switch** to show or hide it. A hidden Dark Style, Do Not
+  Disturb or Night Light button gives its original toggle back in the quick
+  settings grid, so the feature stays reachable. Hidden built-in items are
+  simply hidden, and come back when you turn them on or disable the extension.
 
-Positions count native round buttons, so labels assume the default order
-(Screenshot, Settings, Lock, Power); a position past the last native button is
-treated as "last".
+The **Flexible space** is the gap that splits the row: everything above it
+in the list stays on the left, everything below it is right-aligned. Drag it
+like any other item. By default it comes right after the Battery, as in the
+shell. On a desktop without a battery it is simply the first entry, so
+everything is right-aligned; drag it to the bottom of the list to left-align
+everything instead. If the shell has no separate space widget, the extension
+creates one and stops a self-expanding item (such as the battery) from
+expanding, then restores both when it is disabled. The space cannot be hidden.
+
+Round buttons whose icon is not recognised are matched by their position
+(Screenshot, Settings, Lock, Power in the shell's order) when the count
+allows it.
+
+The **Extension status** line at the bottom shows what the running extension
+sees (version, which built-in items were found, how the space was handled,
+anything it could not recognise, errors). If it says "Not
+running", the shell is still running older code (see Install).
+
+Built-in items are recognised by their icons (camera, settings, lock,
+shutdown, battery), so it works in every language. An item that is not
+present on your system (for example the battery on a desktop) is ignored.
 
 **Sliders page**
 
@@ -55,7 +86,11 @@ gnome-extensions enable efficient-quick-toggle@lurim412
 ```
 
 On Wayland, log out and back in the first time so the shell discovers it.
-If you update an enabled copy, disable and re-enable it so the new schema loads.
+
+**After updating files, log out and back in** (on X11 you can press Alt+F2,
+type `r`, Enter). Disabling and re-enabling is not enough: the shell caches
+the JavaScript modules it already loaded, so it keeps running the old code,
+while the preferences window (a separate process) already uses the new code.
 
 ## Test without touching your session
 
@@ -84,10 +119,14 @@ Before publishing, fill in the `url` field in `metadata.json`.
   night-light-enabled`. If that schema is missing, the button is skipped and
   the native toggle stays visible. Night Light schedule and temperature are
   still configured in Settings → Displays.
+- The layout is stored as a list in `button-layout` and hidden items in
+  `hidden-items`, both using the ids `dark-style`, `dnd`, `night-light`,
+  `battery`, `screenshot`, `settings`, `lock` and `power`.
 - All buttons follow those settings live, so changes made elsewhere are
   reflected.
 - Native toggles are found by icon name (`dark-mode-symbolic`,
   `notifications-disabled-symbolic`, `night-light-symbolic`), so hiding works
   in any language.
 - `disable()` disconnects every signal, destroys the buttons, restores the
-  original toggles and slider styles, as the GNOME review guidelines require.
+  original toggles, the original order and visibility of the top row and the
+  slider styles, as the GNOME review guidelines require.

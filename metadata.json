@@ -11,5 +11,6 @@
     "50"
   ],
   "url": "",
-  "settings-schema": "org.gnome.shell.extensions.efficient-quick-toggle"
+  "settings-schema": "org.gnome.shell.extensions.efficient-quick-toggle",
+  "version-name": "0.6"
 }

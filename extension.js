@@ -1,4 +1,5 @@
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 
 import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -6,17 +7,24 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {RoundToggleButton} from './lib/roundToggleButton.js';
 import {SliderStyler} from './lib/sliderStyler.js';
 import {ToggleHider} from './lib/toggleHider.js';
+import {TopRowLayout} from './lib/topRowLayout.js';
 import {
     BUTTON_DARK_STYLE,
     BUTTON_DND,
     BUTTON_NIGHT_LIGHT,
-    BUTTON_ORDERS,
+    normalizeLayout,
 } from './lib/constants.js';
 
 // Icons used by the native toggles; also used to find and hide them.
 const DARK_STYLE_ICON = 'dark-mode-symbolic';
 const DND_ICON = 'notifications-disabled-symbolic';
 const NIGHT_LIGHT_ICON = 'night-light-symbolic';
+
+const NATIVE_ICONS = {
+    [BUTTON_DARK_STYLE]: DARK_STYLE_ICON,
+    [BUTTON_DND]: DND_ICON,
+    [BUTTON_NIGHT_LIGHT]: NIGHT_LIGHT_ICON,
+};
 
 export default class EfficientQuickToggleExtension extends Extension {
     enable() {
@@ -38,15 +46,25 @@ export default class EfficientQuickToggleExtension extends Extension {
         if (nightLight)
             this._addButton(BUTTON_NIGHT_LIGHT, nightLight);
 
-        // Re-place the buttons whenever a position preference changes.
-        for (const key of ['dark-style-slot', 'dnd-slot', 'night-light-slot', 'button-order'])
-            this._connectSetting(this._settings, `changed::${key}`, () => this._placeButtons());
-        this._placeButtons();
+        this._hider = new ToggleHider(quickSettings.menu._grid, []);
+        this._topRowLayout = new TopRowLayout(topRow);
 
-        const hiddenIcons = [DARK_STYLE_ICON, DND_ICON];
-        if (nightLight)
-            hiddenIcons.push(NIGHT_LIGHT_ICON);
-        this._hider = new ToggleHider(quickSettings.menu._grid, hiddenIcons);
+        // Re-apply when the layout or hidden items change, and when the
+        // shell adds an item to the row later (for example the battery).
+        this._connectSetting(this._settings, 'changed::button-layout',
+            () => this._applyLayout());
+        this._connectSetting(this._settings, 'changed::hidden-items',
+            () => this._applyLayout());
+        this._childAddedId = topRow.connect('child-added', () => {
+            if (this._applying || this._reapplyId)
+                return;
+            this._reapplyId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                this._reapplyId = 0;
+                this._applyLayout();
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+        this._applyLayout();
 
         this._sliderStyler = new SliderStyler(quickSettings, this._settings);
     }
@@ -55,6 +73,15 @@ export default class EfficientQuickToggleExtension extends Extension {
         this._sliderStyler?.destroy();
         this._sliderStyler = null;
 
+        if (this._reapplyId) {
+            GLib.source_remove(this._reapplyId);
+            this._reapplyId = 0;
+        }
+        if (this._childAddedId) {
+            this._topRow.disconnect(this._childAddedId);
+            this._childAddedId = 0;
+        }
+
         this._hider?.destroy();
         this._hider = null;
 
@@ -62,9 +89,12 @@ export default class EfficientQuickToggleExtension extends Extension {
             settings.disconnect(id);
         this._settingsConnections = null;
 
+        // Our buttons first, then put the built-in items back as they were.
         for (const button of this._buttons?.values() ?? [])
             button.destroy();
         this._buttons = null;
+        this._topRowLayout?.destroy();
+        this._topRowLayout = null;
 
         this._settings = null;
         this._interfaceSettings = null;
@@ -154,49 +184,57 @@ export default class EfficientQuickToggleExtension extends Extension {
     }
 
     /**
-     * Put the buttons in the top row according to the preferences.
+     * Apply the `button-layout` and `hidden-items` preferences.
      *
-     * A "slot" is the number of native round buttons (by default Screenshot,
-     * Settings, Lock, Power) that come before our button, so slot 0 is the
-     * very start of the group and the highest slot is the very end. Slots
-     * beyond the number of native buttons are clamped to the end.
+     * Our buttons and the built-in items (battery, screenshot, settings,
+     * lock, power) share one left-to-right order. A hidden button of ours
+     * gives its original toggle back in the quick settings grid, so the
+     * feature stays reachable; hidden built-in items are simply hidden.
      */
-    _placeButtons() {
-        if (!this._topRow || !this._buttons)
+    _applyLayout() {
+        if (!this._buttons || !this._topRowLayout || this._applying)
             return;
 
-        // Take our buttons out first so only native ones are counted.
-        for (const button of this._buttons.values()) {
-            if (button.get_parent() === this._topRow)
-                this._topRow.remove_child(button);
-        }
+        this._applying = true;
+        try {
+            const layout = normalizeLayout(this._settings.get_strv('button-layout'));
+            const hidden = new Set(this._settings.get_strv('hidden-items'));
 
-        const natives = this._topRow.get_children().filter(actor =>
-            actor.has_style_class_name?.('icon-button'));
-        const count = natives.length;
-
-        // Start from the chosen order; buttons that share a slot keep it.
-        const order = BUTTON_ORDERS[this._settings.get_uint('button-order')] ?? BUTTON_ORDERS[0];
-        const entries = order
-            .filter(id => this._buttons.has(id))
-            .map(id => ({
-                button: this._buttons.get(id),
-                slot: Math.min(this._settings.get_uint(`${id}-slot`), count),
-            }))
-            .sort((a, b) => a.slot - b.slot); // stable
-
-        let endAnchor = count > 0 ? natives[count - 1] : null;
-        for (const {button, slot} of entries) {
-            if (slot < count) {
-                // Each button goes directly before its native neighbour,
-                // which keeps buttons sharing a slot in the chosen order.
-                this._topRow.insert_child_below(button, natives[slot]);
-            } else if (endAnchor) {
-                this._topRow.insert_child_above(button, endAnchor);
-                endAnchor = button;
-            } else {
-                this._topRow.add_child(button);
+            const nativeIconsToHide = [];
+            for (const [id, button] of this._buttons) {
+                button.visible = !hidden.has(id);
+                if (button.visible)
+                    nativeIconsToHide.push(NATIVE_ICONS[id]);
             }
+            this._hider?.setIconNames(nativeIconsToHide);
+
+            this._topRowLayout.apply(layout, this._buttons, hidden);
+            this._reportStatus();
+        } catch (e) {
+            console.error(`${this.metadata.uuid}: applying the layout failed`, e);
+            this._setStatus(`Error: ${e.message}`);
+        } finally {
+            this._applying = false;
         }
+    }
+
+    /**
+     * Tell the preferences window what the running extension sees, so a
+     * layout that does nothing can be diagnosed from there.
+     */
+    _reportStatus() {
+        const {found, missing, spacer, unrecognized, children} = this._topRowLayout.summary();
+        const version = this.metadata['version-name'] ?? '?';
+        let text = `Running v${version}. Found: ${found.join(', ') || 'none'}. ` +
+            `Not found: ${missing.join(', ') || 'none'}. Spacer: ${spacer}. ` +
+            `Top row items: ${children}.`;
+        if (unrecognized.length > 0)
+            text += ` Unrecognized: ${unrecognized.join(', ')}.`;
+        this._setStatus(text);
+    }
+
+    _setStatus(text) {
+        if (this._settings && this._settings.get_string('status') !== text)
+            this._settings.set_string('status', text);
     }
 }
