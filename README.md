@@ -83,8 +83,11 @@ it works with any theme that uses the shell's standard slider drawing.
 1. Download the file from the release page.
 2. Extract the file and move the folder to ~/.local/share/gnome-shell/extensions/
 
+or
+
 ```sh
-cp -r efficient-quick-toggle@lurim412 ~/.local/share/gnome-shell/extensions/
+git clone https://github.com/Lurima12/efficient-quick-toggle efficient-quick-setting@lurim412
+cp -r efficient-quick-setting@lurim412 ~/.local/share/gnome-shell/extensions/
 gnome-extensions enable efficient-quick-toggle@lurim412
 ```
 
