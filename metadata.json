@@ -1,6 +1,6 @@
 {
   "uuid": "efficient-quick-toggle@lurim412",
-  "name": "Efficient Quick Toggle",
+  "name": "Efficient Quick Setting",
   "description": "Moves Dark Style and Do Not Disturb out of the quick settings grid and into the top row as round, icon-only buttons next to the screenshot, settings, lock and power buttons.",
   "shell-version": [
     "45",
