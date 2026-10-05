@@ -68,7 +68,7 @@ export default class EfficientQuickTogglePreferences extends ExtensionPreference
 
         const group = new Adw.PreferencesGroup({
             title: _('Top row layout'),
-            description: _('Drag the handle of a row up or down to move that item. The top of the list is the left side of the row. Use the switch to show or hide an item, then press Apply. Everything above the Flexible space sits on the left, everything below it on the right (on a desktop without a battery, leave it at the top to right-align everything). A hidden Dark Style, Do Not Disturb or Night Light button gives its original toggle back.'),
+            description: _('Drag the handle of a row up or down to move that item. The top of the list is the left side of the row. Use the switch to show or hide an item, then press Apply.'),
         });
         page.add(group);
 
